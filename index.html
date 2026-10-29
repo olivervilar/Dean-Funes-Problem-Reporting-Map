@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mapa Ciudadano — Deán Funes, Córdoba</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet CSS y JS CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Ajustes para que Leaflet no tape los modales y scrollbars limpios */
+    .leaflet-pane, .leaflet-top, .leaflet-bottom { z-index: 10 !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.5); border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 overflow-hidden font-sans select-none">
+
+  <!-- ========================================================================= -->
+  <!-- BARRA SUPERIOR FLOTANTE (ESTILO GOOGLE MAPS) -->
+  <!-- ========================================================================= -->
+  <header class="pointer-events-none fixed top-0 left-0 right-0 z-20 p-3 sm:p-4 flex flex-col gap-2">
+    <div class="max-w-7xl mx-auto w-full flex flex-wrap items-center justify-between gap-2">
+      
+      <!-- Buscador y Menú -->
+      <div class="pointer-events-auto relative flex items-center gap-2 bg-white/95 backdrop-blur-md shadow-lg rounded-2xl p-1.5 pl-3 border border-slate-200 flex-1 min-w-[260px] max-w-xl">
+        <button id="btn-toggle-sidebar" class="p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors" title="Ver lista de reportes">
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        </button>
+
+        <div class="hidden sm:flex flex-col pr-2 border-r border-slate-200">
+          <span class="text-xs font-bold text-slate-900 leading-none">Deán Funes</span>
+          <span class="text-[10px] font-medium text-slate-500">Reportes</span>
+        </div>
+
+        <div class="relative flex-1 flex items-center">
+          <svg class="w-4 h-4 text-slate-400 absolute left-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input id="input-search" type="text" placeholder="Buscar calle o problema en Deán Funes..." class="w-full pl-8 pr-7 py-2 text-sm bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none" />
+          <button id="btn-clear-search" class="hidden absolute right-1.5 p-1 text-slate-400 hover:text-slate-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <button id="btn-toggle-filters" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all border border-transparent">
+          <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+          <span class="hidden md:inline">Filtros</span>
+          <span id="badge-total-count" class="px-1.5 py-0.5 text-[11px] rounded-full bg-slate-200 text-slate-700 font-bold">0</span>
+        </button>
+
+        <!-- Sugerencias de calles de Deán Funes -->
+        <div id="search-suggestions" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-30 divide-y divide-slate-100"></div>
+      </div>
+
+      <!-- Botón Reportar y Moderación -->
+      <div class="pointer-events-auto flex items-center gap-2">
+        <button id="btn-open-report-modal" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-sm px-4 py-3 rounded-2xl shadow-lg shadow-blue-600/25 transition-all">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Reportar un problema</span>
+        </button>
+
+        <button id="btn-open-admin-modal" class="p-3 bg-white/95 text-slate-700 border border-slate-200 rounded-2xl shadow-lg hover:bg-slate-100 transition-all" title="Acceso Moderador">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Panel Desplegable de Filtros -->
+    <div id="panel-filters" class="hidden pointer-events-auto max-w-7xl mx-auto w-full bg-white/95 backdrop-blur-md shadow-xl rounded-2xl p-4 border border-slate-200 mt-1">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Categoría</label>
+          <select id="filter-category" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800 focus:outline-none">
+            <option value="all">Todas las categorías</option>
+            <option value="pothole">Bache o calzada rota</option>
+            <option value="water_leak">Pérdida de agua o caño roto</option>
+            <option value="street_light">Alumbrado público</option>
+            <option value="garbage">Basura o microbasural</option>
+            <option value="damaged_sidewalk">Vereda rota</option>
+            <option value="flooding">Anegamiento o desagüe</option>
+            <option value="other">Otro problema</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Estado</label>
+          <select id="filter-status" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800 focus:outline-none">
+            <option value="all">Todos los activos</option>
+            <option value="pending">Pendiente de verificación</option>
+            <option value="community_confirmed">Confirmado por vecinos</option>
+            <option value="verified">Verificado oficialmente</option>
+            <option value="resolved">Resuelto</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Ordenar por</label>
+          <select id="filter-sort" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800 focus:outline-none">
+            <option value="newest">Más recientes primero</option>
+            <option value="oldest">Más antiguos primero</option>
+            <option value="most_confirmed">Más confirmados</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 pt-4">
+          <input id="filter-show-resolved" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+          <label for="filter-show-resolved" class="font-medium text-slate-700 cursor-pointer">Incluir problemas resueltos</label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- CONTENEDOR DEL MAPA LEAFLET -->
+  <!-- ========================================================================= -->
+  <div id="map" class="w-full h-screen bg-slate-200"></div>
+
+  <!-- Botones de Mapa / Satélite y GPS -->
+  <div class="fixed right-3 bottom-24 sm:bottom-28 z-20 flex flex-col gap-2">
+    <button id="btn-my-location" class="bg-white hover:bg-slate-50 active:scale-95 text-slate-700 p-3 rounded-2xl shadow-lg border border-slate-200 transition-all" title="Ir a mi ubicación actual">
+      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a6 6 0 110 12 6 6 0 010-12zm0 4a2 2 0 100 4 2 2 0 000-4z"/></svg>
+    </button>
+    <button id="btn-toggle-tiles" class="bg-white hover:bg-slate-50 active:scale-95 text-slate-700 px-3 py-2.5 rounded-2xl shadow-lg border border-slate-200 flex items-center gap-1.5 text-xs font-semibold transition-all">
+      <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      <span id="label-tile-mode">Satélite</span>
+    </button>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- BARRA LATERAL (LISTA DE REPORTES) -->
+  <!-- ========================================================================= -->
+  <aside id="sidebar-reports" class="hidden fixed z-10 top-20 bottom-4 left-3 w-[calc(100vw-1.5rem)] sm:w-80 md:w-96 bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border border-slate-200 flex-col overflow-hidden">
+    <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-slate-900">Reportes en Deán Funes</h2>
+        <p class="text-xs text-slate-500">Tocá uno para verlo en el mapa</p>
+      </div>
+      <button id="btn-close-sidebar" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="sidebar-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-1"></div>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- TARJETA COMPACTA FLOTANTE AL SELECCIONAR MARCADOR -->
+  <!-- ========================================================================= -->
+  <div id="card-marker-preview" class="hidden fixed bottom-4 left-3 right-3 sm:left-auto sm:right-16 sm:bottom-6 sm:w-96 z-20 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+    <div class="relative h-40 w-full bg-slate-100">
+      <img id="card-img" src="" alt="Foto" class="w-full h-full object-cover" />
+      <span id="card-status-badge" class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm"></span>
+      <button id="card-btn-close" class="absolute top-3 right-3 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full px-2.5 py-1 text-xs font-semibold">Cerrar</button>
+    </div>
+    <div class="p-4">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <span id="card-cat-label" class="text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md"></span>
+        <span id="card-confirmations" class="text-xs font-semibold text-slate-600"></span>
+      </div>
+      <p id="card-description" class="text-sm text-slate-800 line-clamp-2 my-2"></p>
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <button id="card-btn-open-detail" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2.5 px-3 rounded-xl transition-colors">Ver y Confirmar</button>
+        <a id="card-btn-directions" href="#" target="_blank" class="flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold py-2.5 px-3 rounded-xl transition-colors">Ver cómo llegar</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: FORMULARIO REPORTAR UN PROBLEMA -->
+  <!-- ========================================================================= -->
+  <div id="modal-report-form" class="hidden fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Reportar un problema en Deán Funes</h2>
+          <p class="text-xs text-slate-500">Se publicará en tiempo real para todos los vecinos</p>
+        </div>
+        <button id="btn-close-form" class="p-2 rounded-full text-slate-400 hover:text-slate-700">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <form id="form-submit-report" class="p-5 overflow-y-auto space-y-4 text-xs">
+        <div id="form-error-banner" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 font-semibold"></div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">1. Categoría del problema *</label>
+          <select id="form-category" class="w-full rounded-xl border border-slate-300 p-2.5 text-sm bg-white">
+            <option value="pothole">Bache o calzada rota</option>
+            <option value="water_leak">Caño roto o pérdida de agua</option>
+            <option value="street_light">Alumbrado público</option>
+            <option value="garbage">Basura o microbasural</option>
+            <option value="damaged_sidewalk">Vereda rota u obstruida</option>
+            <option value="flooding">Anegamiento o desagüe obstruido</option>
+            <option value="other">Otro problema</option>
+          </select>
+        </div>
+
+        <div id="form-custom-category-group" class="hidden">
+          <label class="block font-bold text-slate-700 mb-1">Especificá el problema *</label>
+          <input id="form-custom-category" type="text" placeholder="Ej: Árbol caído, cables caídos..." class="w-full rounded-xl border border-slate-300 p-2.5 text-sm" />
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">2. Descripción detallada *</label>
+          <textarea id="form-description" rows="3" minlength="10" required placeholder="Referencias, gravedad o peligro que representa..." class="w-full rounded-xl border border-slate-300 p-2.5 text-sm"></textarea>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">3. Evidencia fotográfica (Obligatorio) *</label>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-blue-400 bg-blue-50 text-blue-700 font-bold cursor-pointer hover:bg-blue-100 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <span>Seleccionar foto</span>
+              <input id="form-file-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
+            </label>
+            <div id="form-photo-preview" class="hidden relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
+              <img id="form-photo-img" src="" class="w-full h-full object-cover" />
+              <button id="form-btn-remove-photo" type="button" class="absolute top-0 right-0 bg-slate-900/80 text-white p-1 rounded-bl-lg">&times;</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-bold text-slate-700">4. Ubicación exacta del problema *</label>
+            <button id="form-btn-gps" type="button" class="text-blue-600 font-bold hover:underline">Usar mi GPS actual</button>
+          </div>
+          <p class="text-[11px] text-slate-500 mb-1">Tocá directamente el mapa o arrastrá el marcador rojo.</p>
+          <div id="picker-map" class="w-full h-44 rounded-2xl border border-slate-300"></div>
+          <span id="form-coords-label" class="block text-[11px] text-slate-500 mt-1">Lat: -30.42970, Lng: -64.34960</span>
+        </div>
+
+        <button id="form-btn-submit" type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-lg transition-all">
+          Publicar Reporte en el Mapa
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: DETALLE COMPLETO Y CONFIRMACIÓN CIUDADANA -->
+  <!-- ========================================================================= -->
+  <div id="modal-detail" class="hidden fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span id="detail-category-badge" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800"></span>
+          <span id="detail-status-badge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700"></span>
+        </div>
+        <button id="btn-close-detail" class="p-2 rounded-full text-slate-400 hover:text-slate-700">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 text-xs">
+        <div class="rounded-2xl overflow-hidden bg-slate-900 h-64 sm:h-72">
+          <img id="detail-photo" src="" class="w-full h-full object-contain" />
+        </div>
+
+        <div id="detail-feedback" class="hidden p-3 rounded-xl font-bold"></div>
+
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 mb-1">Descripción del vecino</h3>
+          <p id="detail-description" class="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 whitespace-pre-line"></p>
+        </div>
+
+        <div id="detail-admin-notes-box" class="hidden bg-indigo-50 border border-indigo-200 p-3 rounded-xl text-indigo-900">
+          <span class="font-bold block mb-0.5">Nota Oficial / Municipal:</span>
+          <p id="detail-admin-notes-text"></p>
+        </div>
+
+        <!-- Caja de confirmación comunitaria -->
+        <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-2">
+          <div class="flex justify-between items-center">
+            <span id="detail-confirmations-count" class="font-bold text-slate-900 text-sm"></span>
+            <a id="detail-directions-link" href="#" target="_blank" class="text-blue-700 font-bold underline">Ver cómo llegar en Google Maps</a>
+          </div>
+          <button id="btn-confirm-problem" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all">
+            Confirmar que este problema existe
+          </button>
+        </div>
+
+        <!-- Denunciar reporte -->
+        <div class="border-t border-slate-200 pt-3">
+          <button id="btn-toggle-flag" type="button" class="text-slate-500 hover:text-rose-600">Denunciar reporte falso o duplicado</button>
+          <div id="flag-box" class="hidden mt-2 space-y-2">
+            <input id="flag-reason-input" type="text" placeholder="Motivo de la denuncia..." class="w-full border border-slate-300 rounded-xl p-2" />
+            <button id="btn-send-flag" class="px-3 py-1.5 bg-rose-600 text-white font-bold rounded-lg">Enviar denuncia</button>
+          </div>
+        </div>
+
+        <!-- Panel de moderador dentro del detalle (si inició sesión) -->
+        <div id="detail-moderation-panel" class="hidden bg-slate-900 text-white p-4 rounded-2xl space-y-3">
+          <span class="font-bold text-indigo-300 block">PANEL DE MODERACIÓN OFICIAL</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400">Estado</label>
+              <select id="admin-status-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                <option value="pending">Pendiente</option>
+                <option value="community_confirmed">Confirmado</option>
+                <option value="verified">Verificado</option>
+                <option value="resolved">Resuelto</option>
+                <option value="rejected">Rechazado</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400">Nota oficial</label>
+              <input id="admin-notes-input" type="text" placeholder="Ej: Reparación programada..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
+            </div>
+          </div>
+          <button id="btn-save-moderation" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-lg">Guardar Cambios de Moderador</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: INICIO DE SESIÓN DE MODERADOR / ADMINISTRADOR -->
+  <!-- ========================================================================= -->
+  <div id="modal-admin-login" class="hidden fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4 text-xs">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-900 text-sm">Acceso Moderadores</h3>
+        <button id="btn-close-admin-login" class="text-slate-400 hover:text-slate-700 text-lg">&times;</button>
+      </div>
+      <div id="admin-logged-in-box" class="hidden space-y-3">
+        <p class="text-emerald-700 font-bold">Sesión de administrador activa.</p>
+        <button id="btn-admin-logout" class="w-full py-2 bg-rose-600 text-white font-bold rounded-xl">Cerrar Sesión</button>
+      </div>
+      <form id="form-admin-login" class="space-y-3">
+        <div id="admin-login-error" class="hidden p-2 bg-rose-50 text-rose-700 font-bold rounded-lg"></div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Correo electrónico</label>
+          <input id="admin-email" type="email" required class="w-full border border-slate-300 rounded-xl p-2 text-sm" />
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Contraseña</label>
+          <input id="admin-password" type="password" required class="w-full border border-slate-300 rounded-xl p-2 text-sm" />
+        </div>
+        <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">Entrar como Moderador</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT: LÓGICA COMPLETA DE LA PLATAFORMA -->
+  <!-- ========================================================================= -->
+  <script>
+    // 1. CONFIGURACIÓN DE SUPABASE (Pegá tus credenciales acá)
+    const SUPABASE_URL = 'https://oziyvpmtnofshjqjariv.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'sb_publishable_8QqKtOLcM6U9HaBs9BaK6g_nbgyPjCp';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Coordenadas centrales de Deán Funes, Córdoba
+    const DEAN_FUNES = { lat: -30.4297, lng: -64.3496 };
+
+    const CATEGORIES = {
+      pothole: { label: 'Bache o calzada rota', color: '#DC2626' },
+      water_leak: { label: 'Pérdida de agua', color: '#0284C7' },
+      street_light: { label: 'Alumbrado público', color: '#D97706' },
+      garbage: { label: 'Basura / Microbasural', color: '#16A34A' },
+      damaged_sidewalk: { label: 'Vereda rota', color: '#9333EA' },
+      flooding: { label: 'Anegamiento / Desagüe', color: '#2563EB' },
+      other: { label: 'Otro problema', color: '#475569' }
+    };
+
+    const STATUSES = {
+      pending: { label: 'Pendiente', bg: 'bg-amber-100 text-amber-800' },
+      community_confirmed: { label: 'Confirmado por vecinos', bg: 'bg-blue-100 text-blue-800' },
+      verified: { label: 'Verificado', bg: 'bg-indigo-100 text-indigo-800' },
+      resolved: { label: 'Resuelto', bg: 'bg-emerald-100 text-emerald-800' },
+      rejected: { label: 'Rechazado', bg: 'bg-rose-100 text-rose-800' }
+    };
+
+    // Estado en memoria
+    let reports = [];
+    let confirmedIds = new Set();
+    let currentUserId = null;
+    let isAdmin = false;
+    let selectedReport = null;
+    let selectedPhotoBlob = null;
+    let formPickedCoords = { ...DEAN_FUNES };
+
+    // 2. INICIALIZACIÓN DE MAPAS
+    const map = L.map('map', { center: [DEAN_FUNES.lat, DEAN_FUNES.lng], zoom: 14, zoomControl: false });
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+    const markersLayer = L.layerGroup().addTo(map);
+    let isSat = false;
+
+    document.getElementById('btn-toggle-tiles').addEventListener('click', () => {
+      if (isSat) {
+        map.removeLayer(satLayer); streetLayer.addTo(map);
+        document.getElementById('label-tile-mode').textContent = 'Satélite';
+      } else {
+        map.removeLayer(streetLayer); satLayer.addTo(map);
+        document.getElementById('label-tile-mode').textContent = 'Mapa';
+      }
+      isSat = !isSat;
+    });
+
+    // 3. INICIALIZAR SESIÓN DE USUARIO ANÓNIMA
+    async function initSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        currentUserId = data.session.user.id;
+      } else {
+        const { data: anon } = await supabase.auth.signInAnonymously();
+        currentUserId = anon.user ? anon.user.id : null;
+      }
+      checkAdminStatus();
+    }
+
+    async function checkAdminStatus() {
+      if (!currentUserId) return;
+      const { data } = await supabase.from('admin_users').select('user_id').eq('user_id', currentUserId).maybeSingle();
+      isAdmin = !!data;
+      document.getElementById('detail-moderation-panel').classList.toggle('hidden', !isAdmin);
+      document.getElementById('admin-logged-in-box').classList.toggle('hidden', !isAdmin);
+      document.getElementById('form-admin-login').classList.toggle('hidden', isAdmin);
+    }
+
+    // 4. CARGAR Y RENDERIZAR REPORTES
+    function createPinIcon(color) {
+      return L.divIcon({
+        className: 'bg-transparent border-0',
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="42" viewBox="0 0 38 46" style="filter:drop-shadow(0 3px 5px rgba(0,0,0,0.3));"><path d="M19 1C9.06 1 1 9.06 1 19c0 12.25 16.15 24.75 17.02 25.41a1.65 1.65 0 0 0 1.96 0C20.85 43.75 37 31.25 37 19 37 9.06 28.94 1 19 1z" fill="${color}" stroke="#FFFFFF" stroke-width="2.5"/><circle cx="19" cy="18" r="7" fill="#FFFFFF"/></svg>`,
+        iconSize: [34, 42],
+        iconAnchor: [17, 42]
+      });
+    }
+
+    async function fetchReports() {
+      const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false });
+      if (data) {
+        reports = data;
+        applyFilters();
+      }
+
+      if (currentUserId) {
+        const { data: confs } = await supabase.from('report_confirmations').select('report_id').eq('user_id', currentUserId);
+        if (confs) confirmedIds = new Set(confs.map(c => c.report_id));
+      }
+    }
+
+    function applyFilters() {
+      const cat = document.getElementById('filter-category').value;
+      const stat = document.getElementById('filter-status').value;
+      const search = document.getElementById('input-search').value.toLowerCase().trim();
+      const showResolved = document.getElementById('filter-show-resolved').checked;
+      const sortBy = document.getElementById('filter-sort').value;
+
+      let list = reports.filter(r => {
+        if (r.status === 'rejected' && !isAdmin) return false;
+        if (r.status === 'resolved' && !showResolved && stat !== 'resolved') return false;
+        if (cat !== 'all' && r.category !== cat) return false;
+        if (stat !== 'all' && r.status !== stat) return false;
+        if (search) {
+          const catName = (CATEGORIES[r.category]?.label || '').toLowerCase();
+          const desc = r.description.toLowerCase();
+          if (!catName.includes(search) && !desc.includes(search)) return false;
+        }
+        return true;
+      });
+
+      if (sortBy === 'newest') list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      if (sortBy === 'oldest') list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+      if (sortBy === 'most_confirmed') list.sort((a,b) => b.verification_count - a.verification_count);
+
+      renderMarkers(list);
+      renderSidebar(list);
+      document.getElementById('badge-total-count').textContent = list.length;
+    }
+
+    function renderMarkers(items) {
+      markersLayer.clearLayers();
+      items.forEach(r => {
+        const cat = CATEGORIES[r.category] || CATEGORIES.other;
+        const marker = L.marker([r.latitude, r.longitude], { icon: createPinIcon(cat.color) });
+        marker.on('click', () => showCardPreview(r));
+        marker.addTo(markersLayer);
+      });
+    }
+
+    function renderSidebar(items) {
+      const container = document.getElementById('sidebar-list');
+      container.innerHTML = '';
+      if (!items.length) {
+        container.innerHTML = '<p class="text-xs text-slate-500 p-4 text-center">No hay reportes con estos filtros.</p>';
+        return;
+      }
+      items.forEach(r => {
+        const cat = CATEGORIES[r.category] || CATEGORIES.other;
+        const stat = STATUSES[r.status] || STATUSES.pending;
+        const card = document.createElement('div');
+        card.className = 'p-3 hover:bg-slate-50 cursor-pointer flex gap-3 transition-colors';
+        card.innerHTML = `
+          <img src="${r.image_urls[0]}" class="w-14 h-14 rounded-xl object-cover bg-slate-100 flex-shrink-0" />
+          <div class="flex-1 min-w-0">
+            <span class="font-bold text-[11px] block truncate text-slate-900">${r.custom_category || cat.label}</span>
+            <p class="text-[11px] text-slate-600 line-clamp-1">${r.description}</p>
+            <span class="inline-block px-2 py-0.5 mt-1 rounded-full text-[10px] font-bold ${stat.bg}">${stat.label}</span>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          map.flyTo([r.latitude, r.longitude], 17);
+          showCardPreview(r);
+        });
+        container.appendChild(card);
+      });
+    }
+
+    // 5. TARJETA FLOTANTE Y DETALLE
+    function showCardPreview(r) {
+      selectedReport = r;
+      const cat = CATEGORIES[r.category] || CATEGORIES.other;
+      const stat = STATUSES[r.status] || STATUSES.pending;
+
+      document.getElementById('card-img').src = r.image_urls[0];
+      document.getElementById('card-cat-label').textContent = r.custom_category || cat.label;
+      document.getElementById('card-cat-label').className = `text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${stat.bg}`;
+      document.getElementById('card-status-badge').textContent = stat.label;
+      document.getElementById('card-status-badge').className = `absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm ${stat.bg}`;
+      document.getElementById('card-confirmations').textContent = `${r.verification_count} confirmaciones`;
+      document.getElementById('card-description').textContent = r.description;
+      document.getElementById('card-btn-directions').href = `https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`;
+
+      document.getElementById('card-marker-preview').classList.remove('hidden');
+    }
+
+    document.getElementById('card-btn-close').addEventListener('click', () => {
+      document.getElementById('card-marker-preview').classList.add('hidden');
+    });
+
+    document.getElementById('card-btn-open-detail').addEventListener('click', () => {
+      document.getElementById('card-marker-preview').classList.add('hidden');
+      openDetailModal(selectedReport);
+    });
+
+    function openDetailModal(r) {
+      selectedReport = r;
+      const cat = CATEGORIES[r.category] || CATEGORIES.other;
+      const stat = STATUSES[r.status] || STATUSES.pending;
+
+      document.getElementById('detail-photo').src = r.image_urls[0];
+      document.getElementById('detail-category-badge').textContent = r.custom_category || cat.label;
+      document.getElementById('detail-status-badge').textContent = stat.label;
+      document.getElementById('detail-status-badge').className = `text-xs font-semibold px-2.5 py-1 rounded-full ${stat.bg}`;
+      document.getElementById('detail-description').textContent = r.description;
+      document.getElementById('detail-confirmations-count').textContent = `Confirmaciones de vecinos: ${r.verification_count}`;
+      document.getElementById('detail-directions-link').href = `https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`;
+
+      if (r.admin_notes) {
+        document.getElementById('detail-admin-notes-box').classList.remove('hidden');
+        document.getElementById('detail-admin-notes-text').textContent = r.admin_notes;
+      } else {
+        document.getElementById('detail-admin-notes-box').classList.add('hidden');
+      }
+
+      const btnConfirm = document.getElementById('btn-confirm-problem');
+      if (confirmedIds.has(r.id)) {
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = 'Ya confirmaste este problema';
+        btnConfirm.className = 'w-full py-3 bg-emerald-600 text-white font-bold rounded-xl cursor-default';
+      } else if (r.created_by === currentUserId) {
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = 'Creaste este reporte (otro vecino debe validar)';
+        btnConfirm.className = 'w-full py-3 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed';
+      } else {
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = 'Confirmar que este problema existe';
+        btnConfirm.className = 'w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all';
+      }
+
+      document.getElementById('detail-feedback').classList.add('hidden');
+      document.getElementById('modal-detail').classList.remove('hidden');
+    }
+
+    document.getElementById('btn-close-detail').addEventListener('click', () => {
+      document.getElementById('modal-detail').classList.add('hidden');
+    });
+
+    // 6. CONFIRMAR PROBLEMA Y DENUNCIAR
+    document.getElementById('btn-confirm-problem').addEventListener('click', async () => {
+      const feedback = document.getElementById('detail-feedback');
+      feedback.classList.remove('hidden');
+      try {
+        const { data, error } = await supabase.rpc('confirm_report', { target_report_id: selectedReport.id });
+        if (error) throw error;
+        confirmedIds.add(selectedReport.id);
+        feedback.className = 'p-3 rounded-xl font-bold bg-emerald-50 text-emerald-800';
+        feedback.textContent = '¡Confirmación registrada exitosamente!';
+        openDetailModal({ ...selectedReport, verification_count: data.verification_count, status: data.status });
+        fetchReports();
+      } catch (err) {
+        feedback.className = 'p-3 rounded-xl font-bold bg-rose-50 text-rose-800';
+        feedback.textContent = err.message || 'Error al confirmar.';
+      }
+    });
+
+    document.getElementById('btn-toggle-flag').addEventListener('click', () => {
+      document.getElementById('flag-box').classList.toggle('hidden');
+    });
+
+    document.getElementById('btn-send-flag').addEventListener('click', async () => {
+      const reason = document.getElementById('flag-reason-input').value.trim();
+      if (reason.length < 3) return alert('Por favor escribí el motivo.');
+      await supabase.rpc('flag_report', { target_report_id: selectedReport.id, flag_reason: reason });
+      alert('Reporte enviado para revisión de moderación.');
+      document.getElementById('flag-box').classList.add('hidden');
+    });
+
+    // 7. MODERACIÓN ADMINISTRATIVA
+    document.getElementById('btn-save-moderation').addEventListener('click', async () => {
+      const newStatus = document.getElementById('admin-status-select').value;
+      const notes = document.getElementById('admin-notes-input').value.trim();
+      const { error } = await supabase.from('reports').update({ status: newStatus, admin_notes: notes || null }).eq('id', selectedReport.id);
+      if (!error) {
+        alert('Estado actualizado.');
+        fetchReports();
+        document.getElementById('modal-detail').classList.add('hidden');
+      }
+    });
+
+    // 8. MINI-MAPA SELECTOR DE UBICACIÓN Y SUBIDA DE FOTO
+    let pickerMap, pickerMarker;
+    function initPickerMap() {
+      if (pickerMap) return;
+      pickerMap = L.map('picker-map', { center: [DEAN_FUNES.lat, DEAN_FUNES.lng], zoom: 15 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickerMap);
+      pickerMarker = L.marker([DEAN_FUNES.lat, DEAN_FUNES.lng], { draggable: true, icon: createPinIcon('#DC2626') }).addTo(pickerMap);
+
+      pickerMap.on('click', (e) => {
+        pickerMarker.setLatLng(e.latlng);
+        formPickedCoords = { lat: e.latlng.lat, lng: e.latlng.lng };
+        document.getElementById('form-coords-label').textContent = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
+      });
+      pickerMarker.on('dragend', () => {
+        const p = pickerMarker.getLatLng();
+        formPickedCoords = { lat: p.lat, lng: p.lng };
+        document.getElementById('form-coords-label').textContent = `Lat: ${p.lat.toFixed(5)}, Lng: ${p.lng.toFixed(5)}`;
+      });
+    }
+
+    document.getElementById('btn-open-report-modal').addEventListener('click', () => {
+      document.getElementById('modal-report-form').classList.remove('hidden');
+      setTimeout(() => {
+        initPickerMap();
+        pickerMap.invalidateSize();
+      }, 150);
+    });
+
+    document.getElementById('btn-close-form').addEventListener('click', () => {
+      document.getElementById('modal-report-form').classList.add('hidden');
+    });
+
+    document.getElementById('form-category').addEventListener('change', (e) => {
+      document.getElementById('form-custom-category-group').classList.toggle('hidden', e.target.value !== 'other');
+    });
+
+    // Compresión automática de fotos con Canvas en el navegador
+    document.getElementById('form-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const maxDim = 1280;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+          else { w = Math.round((w * maxDim) / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => {
+          selectedPhotoBlob = blob;
+          document.getElementById('form-photo-img').src = URL.createObjectURL(blob);
+          document.getElementById('form-photo-preview').classList.remove('hidden');
+        }, 'image/jpeg', 0.82);
+      };
+    });
+
+    document.getElementById('form-btn-remove-photo').addEventListener('click', () => {
+      selectedPhotoBlob = null;
+      document.getElementById('form-file-input').value = '';
+      document.getElementById('form-photo-preview').classList.add('hidden');
+    });
+
+    document.getElementById('form-btn-gps').addEventListener('click', () => {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        formPickedCoords = { lat, lng };
+        pickerMap.setView([lat, lng], 17);
+        pickerMarker.setLatLng([lat, lng]);
+        document.getElementById('form-coords-label').textContent = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+      }, () => alert('No se pudo acceder al GPS.'));
+    });
+
+    // Envío del reporte a Supabase Storage y Base de Datos
+    document.getElementById('form-submit-report').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('form-btn-submit');
+      const errBanner = document.getElementById('form-error-banner');
+      errBanner.classList.add('hidden');
+
+      if (!selectedPhotoBlob) {
+        errBanner.textContent = 'Es obligatorio adjuntar una fotografía del problema.';
+        errBanner.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Subiendo fotografía y publicando reporte...';
+
+      try {
+        const cat = document.getElementById('form-category').value;
+        const customCat = document.getElementById('form-custom-category').value.trim();
+        const desc = document.getElementById('form-description').value.trim();
+
+        // 1. Subir foto al Bucket de Storage
+        const filePath = `${currentUserId}/${Date.now()}-${Math.random().toString(36).substr(2, 6)}.jpg`;
+        const { error: uploadErr } = await supabase.storage.from('report-images').upload(filePath, selectedPhotoBlob, { contentType: 'image/jpeg' });
+        if (uploadErr) throw uploadErr;
+
+        const { data: publicUrlData } = supabase.storage.from('report-images').getPublicUrl(filePath);
+
+        // 2. Insertar reporte en PostgreSQL
+        const { error: insertErr } = await supabase.from('reports').insert({
+          category: cat,
+          custom_category: cat === 'other' ? customCat : null,
+          description: desc,
+          latitude: formPickedCoords.lat,
+          longitude: formPickedCoords.lng,
+          image_urls: [publicUrlData.publicUrl],
+          created_by: currentUserId
+        });
+
+        if (insertErr) throw insertErr;
+
+        // Resetear formulario
+        document.getElementById('form-submit-report').reset();
+        selectedPhotoBlob = null;
+        document.getElementById('form-photo-preview').classList.add('hidden');
+        document.getElementById('modal-report-form').classList.add('hidden');
+        fetchReports();
+      } catch (err) {
+        errBanner.textContent = err.message || 'Error al publicar el reporte.';
+        errBanner.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Publicar Reporte en el Mapa';
+      }
+    });
+
+    // 9. BÚSQUEDA DE CALLES CON NOMINATIM OPENSTREETMAP
+    let searchDebounce;
+    document.getElementById('input-search').addEventListener('input', (e) => {
+      clearTimeout(searchDebounce);
+      const query = e.target.value.trim();
+      document.getElementById('btn-clear-search').classList.toggle('hidden', !query);
+      applyFilters();
+
+      if (query.length < 3) {
+        document.getElementById('search-suggestions').classList.add('hidden');
+        return;
+      }
+
+      searchDebounce = setTimeout(async () => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Deán Funes, Córdoba')}&limit=4&accept-language=es`);
+          const results = await res.json();
+          const box = document.getElementById('search-suggestions');
+          box.innerHTML = '';
+          if (results.length) {
+            box.classList.remove('hidden');
+            results.forEach(item => {
+              const b = document.createElement('button');
+              b.className = 'w-full text-left px-4 py-2 hover:bg-blue-50 text-xs text-slate-800 block truncate';
+              b.textContent = item.display_name;
+              b.onclick = () => {
+                map.flyTo([item.lat, item.lon], 17);
+                box.classList.add('hidden');
+              };
+              box.appendChild(b);
+            });
+          } else {
+            box.classList.add('hidden');
+          }
+        } catch {}
+      }, 400);
+    });
+
+    document.getElementById('btn-clear-search').addEventListener('click', () => {
+      document.getElementById('input-search').value = '';
+      document.getElementById('btn-clear-search').classList.add('hidden');
+      document.getElementById('search-suggestions').classList.add('hidden');
+      applyFilters();
+    });
+
+    // 10. BOTONES DE INTERFAZ Y MODERADOR
+    document.getElementById('btn-toggle-filters').addEventListener('click', () => {
+      document.getElementById('panel-filters').classList.toggle('hidden');
+    });
+    document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+      document.getElementById('sidebar-reports').classList.toggle('hidden');
+    });
+    document.getElementById('btn-close-sidebar').addEventListener('click', () => {
+      document.getElementById('sidebar-reports').classList.add('hidden');
+    });
+
+    ['filter-category', 'filter-status', 'filter-sort', 'filter-show-resolved'].forEach(id => {
+      document.getElementById(id).addEventListener('change', applyFilters);
+    });
+
+    document.getElementById('btn-my-location').addEventListener('click', () => {
+      navigator.geolocation.getCurrentPosition(pos => {
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 17);
+      }, () => alert('No se pudo obtener el GPS.'));
+    });
+
+    // Login Admin
+    document.getElementById('btn-open-admin-modal').addEventListener('click', () => {
+      document.getElementById('modal-admin-login').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-admin-login').addEventListener('click', () => {
+      document.getElementById('modal-admin-login').classList.add('hidden');
+    });
+    document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('admin-email').value.trim();
+      const password = document.getElementById('admin-password').value;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        document.getElementById('admin-login-error').textContent = 'Credenciales no autorizadas.';
+        document.getElementById('admin-login-error').classList.remove('hidden');
+      } else {
+        currentUserId = data.user.id;
+        await checkAdminStatus();
+        document.getElementById('modal-admin-login').classList.add('hidden');
+        alert('Sesión de moderador iniciada.');
+      }
+    });
+    document.getElementById('btn-admin-logout').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      isAdmin = false;
+      await initSession();
+      document.getElementById('modal-admin-login').classList.add('hidden');
+      alert('Sesión cerrada.');
+    });
+
+    // 11. ACTUALIZACIONES EN TIEMPO REAL CON SUPABASE REALTIME
+    supabase.channel('public:reports')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => {
+        fetchReports();
+      })
+      .subscribe();
+
+    // INICIO
+    initSession().then(fetchReports);
+  </script>
+</body>
+</html>
