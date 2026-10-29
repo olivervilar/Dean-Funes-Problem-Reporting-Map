@@ -6,13 +6,13 @@
   <meta name="referrer" content="origin" />
   <title>Mapa Ciudadano — Deán Funes, Córdoba</title>
 
-  <!-- 1. Leaflet CSS (Cargado primero para garantizar dimensiones del mapa) -->
+  <!-- 1. Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <!-- 2. Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- 3. CSS Puro de Seguridad (Garantiza que el mapa se vea aunque Tailwind tarde en cargar) -->
+  <!-- 3. CSS Puro de Seguridad -->
   <style>
     html, body {
       margin: 0;
@@ -24,7 +24,6 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* Fuerza dimensiones explícitas en el contenedor principal y el mini-mapa */
     #map {
       position: fixed;
       top: 0;
@@ -45,7 +44,6 @@
       background-color: #e2e8f0;
     }
 
-    /* Evita que Tailwind rompa las imágenes internas de los mapas de Leaflet */
     .leaflet-container img.leaflet-tile {
       max-width: none !important;
       max-height: none !important;
@@ -61,14 +59,10 @@
 </head>
 <body class="text-slate-900 select-none">
 
-  <!-- ========================================================================= -->
-  <!-- CONTENEDOR DEL MAPA PRINCIPAL (LEAFLET - DEÁN FUNES) -->
-  <!-- ========================================================================= -->
+  <!-- CONTENEDOR DEL MAPA PRINCIPAL -->
   <div id="map"></div>
 
-  <!-- ========================================================================= -->
   <!-- BARRA SUPERIOR FLOTANTE -->
-  <!-- ========================================================================= -->
   <header class="pointer-events-none fixed top-0 left-0 right-0 z-20 p-3 sm:p-4 flex flex-col gap-2">
     <div class="max-w-7xl mx-auto w-full flex flex-wrap items-center justify-between gap-2">
       
@@ -133,11 +127,12 @@
         <div>
           <label class="block font-bold text-slate-700 mb-1">Estado</label>
           <select id="filter-status" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800 focus:outline-none">
-            <option value="all">Todos los activos</option>
+            <option value="all">Todos los problemas activos</option>
             <option value="pending">Pendiente de verificación</option>
             <option value="community_confirmed">Confirmado por vecinos</option>
             <option value="verified">Verificado oficialmente</option>
-            <option value="resolved">Resuelto</option>
+            <option value="resolved">Solo problemas resueltos</option>
+            <option id="opt-filter-rejected" value="rejected" class="hidden">Solo rechazados (Moderador)</option>
           </select>
         </div>
         <div>
@@ -151,7 +146,7 @@
         <div class="flex items-center justify-between gap-2 pt-4">
           <label class="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
             <input id="filter-show-resolved" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600" />
-            <span>Incluir resueltos</span>
+            <span>Mostrar resueltos</span>
           </label>
           <button id="btn-reset-filters" type="button" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg">Restablecer</button>
         </div>
@@ -170,13 +165,11 @@
     </button>
   </div>
 
-  <!-- ========================================================================= -->
   <!-- BARRA LATERAL (LISTA DE REPORTES) -->
-  <!-- ========================================================================= -->
   <aside id="sidebar-reports" class="hidden fixed z-20 top-20 bottom-4 left-3 w-[calc(100vw-1.5rem)] sm:w-80 md:w-96 bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border border-slate-200 flex flex-col overflow-hidden">
     <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
       <div>
-        <h2 class="text-sm font-bold text-slate-900">Reportes en Deán Funes</h2>
+        <h2 class="text-sm font-bold text-slate-900">Reportes activos</h2>
         <p class="text-xs text-slate-500">Tocá un reporte para centrarlo en el mapa</p>
       </div>
       <button id="btn-close-sidebar" type="button" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
@@ -186,9 +179,7 @@
     <div id="sidebar-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-1"></div>
   </aside>
 
-  <!-- ========================================================================= -->
   <!-- TARJETA FLOTANTE AL SELECCIONAR MARCADOR -->
-  <!-- ========================================================================= -->
   <div id="card-marker-preview" class="hidden fixed bottom-4 left-3 right-3 sm:left-auto sm:right-16 sm:bottom-6 sm:w-96 z-20 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
     <div class="relative h-40 w-full bg-slate-100">
       <img id="card-img" src="" alt="Evidencia" class="w-full h-full object-cover" />
@@ -203,15 +194,13 @@
       <p id="card-description" class="text-sm text-slate-800 line-clamp-2 my-2"></p>
       <div class="text-[11px] text-slate-400 mb-3" id="card-date"></div>
       <div class="grid grid-cols-2 gap-2">
-        <button id="card-btn-open-detail" type="button" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2.5 px-3 rounded-xl transition-colors">Ver y Confirmar</button>
+        <button id="card-btn-open-detail" type="button" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2.5 px-3 rounded-xl transition-colors">Votar / Ver Detalle</button>
         <a id="card-btn-directions" href="#" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold py-2.5 px-3 rounded-xl transition-colors">Ver cómo llegar</a>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================= -->
   <!-- MODAL: FORMULARIO REPORTAR UN PROBLEMA -->
-  <!-- ========================================================================= -->
   <div id="modal-report-form" class="hidden fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
     <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[94vh] flex flex-col">
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -282,9 +271,7 @@
     </div>
   </div>
 
-  <!-- ========================================================================= -->
-  <!-- MODAL: DETALLE COMPLETO Y CONFIRMACIÓN -->
-  <!-- ========================================================================= -->
+  <!-- MODAL: DETALLE COMPLETO Y VOTACIÓN CIUDADANA -->
   <div id="modal-detail" class="hidden fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
     <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -298,14 +285,17 @@
       </div>
 
       <div class="p-5 overflow-y-auto space-y-4 text-xs">
-        <div class="rounded-2xl overflow-hidden bg-slate-900 h-64 sm:h-72">
+        <div class="rounded-2xl overflow-hidden bg-slate-900 h-60 sm:h-72">
           <img id="detail-photo" src="" alt="Evidencia" class="w-full h-full object-contain" />
         </div>
 
         <div id="detail-feedback" class="hidden p-3 rounded-xl font-bold"></div>
 
         <div>
-          <h3 class="text-sm font-bold text-slate-900 mb-1">Descripción del problema</h3>
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="text-sm font-bold text-slate-900">Descripción del problema</h3>
+            <a id="detail-directions-link" href="#" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-bold hover:underline">Ver cómo llegar en Google Maps &rarr;</a>
+          </div>
           <p id="detail-description" class="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 whitespace-pre-line"></p>
         </div>
 
@@ -314,52 +304,61 @@
           <p id="detail-admin-notes-text"></p>
         </div>
 
-        <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl space-y-2">
-          <div class="flex justify-between items-center">
-            <span id="detail-confirmations-count" class="font-bold text-slate-900 text-sm"></span>
-            <a id="detail-directions-link" href="#" target="_blank" rel="noopener noreferrer" class="text-blue-700 font-bold underline">Ver cómo llegar en Google Maps</a>
+        <!-- PANEL DE VOTACIÓN COMUNITARIA PARA VECINOS -->
+        <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3">
+          <div class="flex flex-wrap justify-between items-center gap-2">
+            <div>
+              <span class="font-bold text-slate-900 text-sm block">Votación de los Vecinos</span>
+              <span class="text-[11px] text-slate-500">Con 3 votos de vecinos se confirma o se da de baja automáticamente</span>
+            </div>
+            <div class="flex gap-2">
+              <span id="detail-confirmations-count" class="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-bold"></span>
+              <span id="detail-flags-count" class="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 font-bold"></span>
+            </div>
           </div>
+
+          <!-- Botón 1: Confirmar que existe -->
           <button id="btn-confirm-problem" type="button" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all">
-            Confirmar que este problema existe
+            👍 Confirmar que este problema existe
           </button>
-        </div>
 
-        <div class="border-t border-slate-200 pt-3">
-          <button id="btn-toggle-flag" type="button" class="text-slate-500 hover:text-rose-600 font-medium">Denunciar reporte falso, duplicado o inapropiado</button>
-          <div id="flag-box" class="hidden mt-2 space-y-2">
-            <input id="flag-reason-input" type="text" placeholder="Motivo de la denuncia..." class="w-full border border-slate-300 rounded-xl p-2" />
-            <button id="btn-send-flag" type="button" class="px-3 py-1.5 bg-rose-600 text-white font-bold rounded-lg">Enviar a revisión</button>
+          <!-- Botones 2 y 3: Votar que ya se arregló o que es falso para quitarlo del mapa -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <button id="btn-vote-resolved" type="button" class="py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold rounded-xl transition-colors">
+              ✅ Votar: Ya fue solucionado
+            </button>
+            <button id="btn-vote-fake" type="button" class="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold rounded-xl transition-colors">
+              🗑️ Votar: Es falso / No existe
+            </button>
           </div>
         </div>
 
-        <!-- Panel de Moderador -->
+        <!-- Panel exclusivo de Moderador (si inició sesión) -->
         <div id="detail-moderation-panel" class="hidden bg-slate-900 text-white p-4 rounded-2xl space-y-3">
-          <span class="font-bold text-indigo-300 block">PANEL DE MODERACIÓN OFICIAL</span>
+          <span class="font-bold text-indigo-300 block">DECISIÓN DIRECTA DE MODERADOR (1 CLIC)</span>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label class="block text-[10px] text-slate-400">Cambiar Estado</label>
+              <label class="block text-[10px] text-slate-400">Cambiar Estado Oficial</label>
               <select id="admin-status-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
                 <option value="pending">Pendiente</option>
                 <option value="community_confirmed">Confirmado por vecinos</option>
-                <option value="verified">Verificado</option>
-                <option value="resolved">Resuelto</option>
-                <option value="rejected">Rechazado</option>
+                <option value="verified">Verificado oficialmente</option>
+                <option value="resolved">Resuelto (Quitar del mapa activo)</option>
+                <option value="rejected">Rechazado (Eliminar del mapa)</option>
               </select>
             </div>
             <div>
               <label class="block text-[10px] text-slate-400">Nota oficial</label>
-              <input id="admin-notes-input" type="text" placeholder="Ej: Cuadrilla asignada..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
+              <input id="admin-notes-input" type="text" placeholder="Ej: Reparado por cuadrilla..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
             </div>
           </div>
-          <button id="btn-save-moderation" type="button" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-lg">Guardar Cambios</button>
+          <button id="btn-save-moderation" type="button" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-lg">Aplicar Cambio Inmediato</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================= -->
   <!-- MODAL: LOGIN ADMINISTRADOR -->
-  <!-- ========================================================================= -->
   <div id="modal-admin-login" class="hidden fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4 text-xs">
       <div class="flex justify-between items-center border-b pb-2">
@@ -385,27 +384,19 @@
     </div>
   </div>
 
-  <!-- ========================================================================= -->
-  <!-- SCRIPTS EXTERNOS (LEAFLET Y SUPABASE) -->
-  <!-- ========================================================================= -->
+  <!-- SCRIPTS EXTERNOS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- ========================================================================= -->
-  <!-- LÓGICA PRINCIPAL DE LA APLICACIÓN -->
-  <!-- ========================================================================= -->
+  <!-- LÓGICA PRINCIPAL -->
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. CONFIGURACIÓN DE SUPABASE CON TUS CREDENCIALES EXACTAS
-      // Limpia automáticamente "/rest/v1/" si estuviera escrito para que el cliente de Supabase no falle
+      // 1. CONFIGURACIÓN DE SUPABASE
       const RAW_SUPABASE_URL = 'https://oziyvpmtnofshjqjariv.supabase.co/rest/v1/';
       const SUPABASE_URL = RAW_SUPABASE_URL.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
       const SUPABASE_ANON_KEY = 'sb_publishable_8QqKtOLcM6U9HaBs9BaK6g_nbgyPjCp';
 
-      // Usamos dbClient para no chocar con el nombre global window.supabase
       const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      // Coordenadas exactas de Deán Funes, Córdoba, Argentina
       const DEAN_FUNES = { lat: -30.4297, lng: -64.3496 };
 
       const CATEGORIES = {
@@ -428,13 +419,14 @@
 
       let reports = [];
       let confirmedIds = new Set();
+      let flaggedIds = new Set();
       let currentUserId = null;
       let isAdmin = false;
       let selectedReport = null;
       let selectedPhotoBlob = null;
       let formPickedCoords = { ...DEAN_FUNES };
 
-      // 2. INICIALIZAR EL MAPA DE DEÁN FUNES CON LEAFLET
+      // 2. INICIALIZAR MAPA LEAFLET EN DEÁN FUNES
       const map = L.map('map', {
         center: [DEAN_FUNES.lat, DEAN_FUNES.lng],
         zoom: 14,
@@ -445,7 +437,6 @@
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Capa de calles OpenStreetMap y respaldo automático en caso de bloqueo
       const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap'
@@ -459,7 +450,6 @@
       const markersLayer = L.layerGroup().addTo(map);
       let isSat = false;
 
-      // Garantizar que el mapa calcule sus dimensiones reales después de aplicar estilos
       setTimeout(() => map.invalidateSize(), 100);
       setTimeout(() => map.invalidateSize(), 600);
       window.addEventListener('resize', () => map.invalidateSize());
@@ -477,7 +467,7 @@
         isSat = !isSat;
       });
 
-      // 3. SESIÓN DE USUARIO Y MODERADOR
+      // 3. SESIÓN Y PERMISOS
       async function initSession() {
         try {
           const { data } = await dbClient.auth.getSession();
@@ -488,9 +478,7 @@
             currentUserId = anon && anon.user ? anon.user.id : null;
           }
           await checkAdminStatus();
-        } catch (e) {
-          console.warn('Aviso de sesión:', e);
-        }
+        } catch (e) {}
       }
 
       async function checkAdminStatus() {
@@ -505,10 +493,11 @@
           document.getElementById('detail-moderation-panel').classList.toggle('hidden', !isAdmin);
           document.getElementById('admin-logged-in-box').classList.toggle('hidden', !isAdmin);
           document.getElementById('form-admin-login').classList.toggle('hidden', isAdmin);
+          document.getElementById('opt-filter-rejected').classList.toggle('hidden', !isAdmin);
         } catch (e) {}
       }
 
-      // 4. MARCADORES Y LISTA DE REPORTES
+      // 4. CARGAR Y FILTRAR REPORTES (Oculta rechazados y resueltos del mapa activo)
       function createPinIcon(color) {
         return L.divIcon({
           className: 'bg-transparent border-0',
@@ -527,7 +516,6 @@
 
           if (!error && data) {
             reports = data;
-            applyFilters();
           }
 
           if (currentUserId) {
@@ -536,36 +524,62 @@
               .select('report_id')
               .eq('user_id', currentUserId);
             if (confs) confirmedIds = new Set(confs.map(c => c.report_id));
+
+            const { data: flags } = await dbClient
+              .from('report_flags')
+              .select('report_id')
+              .eq('user_id', currentUserId);
+            if (flags) flaggedIds = new Set(flags.map(f => f.report_id));
           }
-        } catch (e) {
-          console.error('Error cargando reportes:', e);
-        }
+
+          applyFilters();
+        } catch (e) {}
       }
 
-      function applyFilters() {
+      function isReportVisible(r) {
         const cat = document.getElementById('filter-category').value;
         const stat = document.getElementById('filter-status').value;
         const search = document.getElementById('input-search').value.toLowerCase().trim();
         const showResolved = document.getElementById('filter-show-resolved').checked;
-        const sortBy = document.getElementById('filter-sort').value;
 
-        let list = reports.filter(r => {
-          if (r.status === 'rejected' && !isAdmin) return false;
-          if (r.status === 'resolved' && !showResolved && stat !== 'resolved') return false;
-          if (cat !== 'all' && r.category !== cat) return false;
-          if (stat !== 'all' && r.status !== stat) return false;
-          if (search) {
-            const catName = (CATEGORIES[r.category]?.label || '').toLowerCase();
-            const custom = (r.custom_category || '').toLowerCase();
-            const desc = (r.description || '').toLowerCase();
-            if (!catName.includes(search) && !custom.includes(search) && !desc.includes(search)) return false;
-          }
-          return true;
-        });
+        // REGLA ESTRICTA 1: Los reportes rechazados SIEMPRE desaparecen del mapa general
+        // (Solo se ven si un moderador elige explícitamente "Solo rechazados" en el filtro)
+        if (r.status === 'rejected') {
+          if (!isAdmin || stat !== 'rejected') return false;
+        }
+
+        // REGLA ESTRICTA 2: Los reportes resueltos desaparecen del mapa activo
+        // (Solo se ven si el vecino tilda "Mostrar resueltos" o filtra por "resolved")
+        if (r.status === 'resolved') {
+          if (!showResolved && stat !== 'resolved') return false;
+        }
+
+        if (cat !== 'all' && r.category !== cat) return false;
+        if (stat !== 'all' && r.status !== stat) return false;
+        if (search) {
+          const catName = (CATEGORIES[r.category]?.label || '').toLowerCase();
+          const custom = (r.custom_category || '').toLowerCase();
+          const desc = (r.description || '').toLowerCase();
+          if (!catName.includes(search) && !custom.includes(search) && !desc.includes(search)) return false;
+        }
+        return true;
+      }
+
+      function applyFilters() {
+        const sortBy = document.getElementById('filter-sort').value;
+        let list = reports.filter(isReportVisible);
 
         if (sortBy === 'newest') list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
         if (sortBy === 'oldest') list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
         if (sortBy === 'most_confirmed') list.sort((a,b) => b.verification_count - a.verification_count);
+
+        // Si el reporte que estaba abierto en la tarjeta inferior acaba de pasar a rechazado o resuelto, cerrarlo de inmediato
+        if (selectedReport) {
+          const updatedSelected = reports.find(item => item.id === selectedReport.id);
+          if (!updatedSelected || !isReportVisible(updatedSelected)) {
+            document.getElementById('card-marker-preview').classList.add('hidden');
+          }
+        }
 
         renderMarkers(list);
         renderSidebar(list);
@@ -590,7 +604,7 @@
         const container = document.getElementById('sidebar-list');
         container.innerHTML = '';
         if (!items.length) {
-          container.innerHTML = '<p class="text-xs text-slate-500 p-6 text-center">No hay reportes visibles con estos filtros.</p>';
+          container.innerHTML = '<p class="text-xs text-slate-500 p-6 text-center">No hay problemas activos con estos filtros.</p>';
           return;
         }
         items.forEach(r => {
@@ -605,7 +619,7 @@
               <p class="text-[11px] text-slate-600 line-clamp-1">${r.description}</p>
               <div class="flex items-center justify-between mt-1">
                 <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${stat.bg}">${stat.label}</span>
-                <span class="text-[10px] font-bold text-slate-500">${r.verification_count} conf.</span>
+                <span class="text-[10px] font-bold text-slate-500">👍 ${r.verification_count} | 👎 ${r.flag_count || 0}</span>
               </div>
             </div>
           `;
@@ -617,7 +631,7 @@
         });
       }
 
-      // 5. TARJETA DE VISTA RÁPIDA Y MODAL DE DETALLE
+      // 5. TARJETA Y MODAL DE DETALLE CON BOTONES DE VOTACIÓN
       function showCardPreview(r) {
         selectedReport = r;
         const cat = CATEGORIES[r.category] || CATEGORIES.other;
@@ -628,7 +642,7 @@
         document.getElementById('card-cat-label').className = `text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${stat.bg}`;
         document.getElementById('card-status-badge').textContent = stat.label;
         document.getElementById('card-status-badge').className = `absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm ${stat.bg}`;
-        document.getElementById('card-confirmations').textContent = `${r.verification_count} confirm.`;
+        document.getElementById('card-confirmations').textContent = `👍 ${r.verification_count} | 👎 ${r.flag_count || 0}/3`;
         document.getElementById('card-description').textContent = r.description;
         document.getElementById('card-date').textContent = new Date(r.created_at).toLocaleString('es-AR');
         document.getElementById('card-btn-directions').href = `https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`;
@@ -655,8 +669,12 @@
         document.getElementById('detail-status-badge').textContent = stat.label;
         document.getElementById('detail-status-badge').className = `text-xs font-semibold px-2.5 py-1 rounded-full ${stat.bg}`;
         document.getElementById('detail-description').textContent = r.description;
-        document.getElementById('detail-confirmations-count').textContent = `Confirmaciones: ${r.verification_count}`;
+        document.getElementById('detail-confirmations-count').textContent = `👍 Existe: ${r.verification_count}/3`;
+        document.getElementById('detail-flags-count').textContent = `🗑️ Baja / Solución: ${r.flag_count || 0}/3`;
         document.getElementById('detail-directions-link').href = `https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}`;
+
+        document.getElementById('admin-status-select').value = r.status;
+        document.getElementById('admin-notes-input').value = r.admin_notes || '';
 
         if (r.admin_notes) {
           document.getElementById('detail-admin-notes-box').classList.remove('hidden');
@@ -668,7 +686,7 @@
         const btnConfirm = document.getElementById('btn-confirm-problem');
         if (confirmedIds.has(r.id)) {
           btnConfirm.disabled = true;
-          btnConfirm.textContent = 'Ya confirmaste este problema';
+          btnConfirm.textContent = '✓ Ya confirmaste que existe';
           btnConfirm.className = 'w-full py-3 bg-emerald-600 text-white font-bold rounded-xl cursor-default';
         } else if (currentUserId && r.created_by === currentUserId) {
           btnConfirm.disabled = true;
@@ -676,8 +694,22 @@
           btnConfirm.className = 'w-full py-3 bg-slate-300 text-slate-600 font-bold rounded-xl cursor-not-allowed';
         } else {
           btnConfirm.disabled = false;
-          btnConfirm.textContent = 'Confirmar que este problema existe';
+          btnConfirm.textContent = '👍 Confirmar que este problema existe';
           btnConfirm.className = 'w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all';
+        }
+
+        const alreadyFlagged = flaggedIds.has(r.id);
+        const btnResolved = document.getElementById('btn-vote-resolved');
+        const btnFake = document.getElementById('btn-vote-fake');
+
+        btnResolved.disabled = alreadyFlagged;
+        btnFake.disabled = alreadyFlagged;
+        if (alreadyFlagged) {
+          btnResolved.textContent = '✓ Voto de baja/solución registrado';
+          btnFake.textContent = '✓ Voto de baja/solución registrado';
+        } else {
+          btnResolved.textContent = '✅ Votar: Ya fue solucionado';
+          btnFake.textContent = '🗑️ Votar: Es falso / No existe';
         }
 
         document.getElementById('detail-feedback').classList.add('hidden');
@@ -688,7 +720,7 @@
         document.getElementById('modal-detail').classList.add('hidden');
       });
 
-      // 6. CONFIRMAR Y DENUNCIAR REPORTES
+      // 6. VOTACIÓN CIUDADANA (EXISTE vs YA SE ARREGLÓ vs ES FALSO)
       document.getElementById('btn-confirm-problem').addEventListener('click', async () => {
         const feedback = document.getElementById('detail-feedback');
         feedback.classList.remove('hidden');
@@ -698,40 +730,74 @@
           if (error) throw error;
           confirmedIds.add(selectedReport.id);
           feedback.className = 'p-3 rounded-xl font-bold bg-emerald-50 text-emerald-800';
-          feedback.textContent = '¡Confirmación registrada con éxito!';
+          feedback.textContent = '¡Confirmación registrada!';
+          await fetchReports();
           openDetailModal({ ...selectedReport, verification_count: data.verification_count, status: data.status });
-          fetchReports();
         } catch (err) {
           feedback.className = 'p-3 rounded-xl font-bold bg-rose-50 text-rose-800';
-          feedback.textContent = err.message || 'No se pudo registrar la confirmación.';
+          feedback.textContent = err.message || 'No se pudo registrar.';
         }
       });
 
-      document.getElementById('btn-toggle-flag').addEventListener('click', () => {
-        document.getElementById('flag-box').classList.toggle('hidden');
-      });
+      async function handleCitizenRemovalVote(voteType) {
+        const feedback = document.getElementById('detail-feedback');
+        feedback.classList.remove('hidden');
+        try {
+          if (!currentUserId) await initSession();
+          const reasonText = voteType === 'resolved'
+            ? 'RESUELTO: Vecino votó que el problema ya fue solucionado'
+            : 'FALSO: Vecino votó que el problema no existe o es falso';
 
-      document.getElementById('btn-send-flag').addEventListener('click', async () => {
-        const reason = document.getElementById('flag-reason-input').value.trim();
-        if (reason.length < 3) return alert('Por favor indicá el motivo.');
-        const { error } = await dbClient.rpc('flag_report', { target_report_id: selectedReport.id, flag_reason: reason });
-        if (error) return alert(error.message);
-        alert('Enviado a moderación.');
-        document.getElementById('flag-box').classList.add('hidden');
-      });
+          const { data, error } = await dbClient.rpc('flag_report', {
+            target_report_id: selectedReport.id,
+            flag_reason: reasonText
+          });
+          if (error) throw error;
 
-      // 7. PANEL MODERADOR
+          flaggedIds.add(selectedReport.id);
+          await fetchReports();
+
+          // Si con este voto llegó a 3 y cambió a rechazado o resuelto, cerramos el modal y desaparece del mapa
+          if (data && (data.status === 'rejected' || data.status === 'resolved')) {
+            document.getElementById('modal-detail').classList.add('hidden');
+            document.getElementById('card-marker-preview').classList.add('hidden');
+            alert(
+              data.status === 'resolved'
+                ? '¡Se alcanzaron 3 votos vecinales! El problema fue marcado como Resuelto y retirado del mapa activo.'
+                : '¡Se alcanzaron 3 votos vecinales! El reporte falso fue eliminado del mapa.'
+            );
+          } else {
+            feedback.className = 'p-3 rounded-xl font-bold bg-amber-50 text-amber-900 border border-amber-200';
+            feedback.textContent = `Voto registrado (${data.flag_count}/3). Con 3 votos de vecinos se retira automáticamente del mapa.`;
+            openDetailModal({ ...selectedReport, flag_count: data.flag_count, status: data.status || selectedReport.status });
+          }
+        } catch (err) {
+          feedback.className = 'p-3 rounded-xl font-bold bg-rose-50 text-rose-800';
+          feedback.textContent = err.message || 'Ya votaste en este reporte.';
+        }
+      }
+
+      document.getElementById('btn-vote-resolved').addEventListener('click', () => handleCitizenRemovalVote('resolved'));
+      document.getElementById('btn-vote-fake').addEventListener('click', () => handleCitizenRemovalVote('fake'));
+
+      // 7. PANEL MODERADOR (Eliminación/Resolución instantánea)
       document.getElementById('btn-save-moderation').addEventListener('click', async () => {
         const newStatus = document.getElementById('admin-status-select').value;
         const notes = document.getElementById('admin-notes-input').value.trim();
-        const { error } = await dbClient.from('reports').update({ status: newStatus, admin_notes: notes || null }).eq('id', selectedReport.id);
-        if (error) return alert(error.message);
-        alert('Reporte actualizado por moderador.');
-        fetchReports();
+        const { error } = await dbClient
+          .from('reports')
+          .update({ status: newStatus, admin_notes: notes || null })
+          .eq('id', selectedReport.id);
+
+        if (error) return alert('Error: ' + error.message);
+
+        // Cerrar modales y refrescar el mapa para que desaparezca inmediatamente si fue rechazado o resuelto
         document.getElementById('modal-detail').classList.add('hidden');
+        document.getElementById('card-marker-preview').classList.add('hidden');
+        await fetchReports();
       });
 
-      // 8. FORMULARIO DE NUEVO REPORTE Y SELECTOR DE UBICACIÓN
+      // 8. FORMULARIO DE NUEVO REPORTE
       let pickerMap = null;
       let pickerMarker = null;
 
@@ -772,7 +838,6 @@
         document.getElementById('form-custom-category-group').classList.toggle('hidden', e.target.value !== 'other');
       });
 
-      // Compresión de fotografía en el navegador
       document.getElementById('form-file-input').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -832,7 +897,7 @@
         try {
           if (!currentUserId) await initSession();
           if (!currentUserId) {
-            throw new Error('Activa "Anonymous Sign-Ins" en Supabase -> Authentication -> Providers para permitir reportes.');
+            throw new Error('Activá "Anonymous Sign-Ins" en Supabase -> Authentication -> Providers.');
           }
 
           const cat = document.getElementById('form-category').value;
@@ -920,7 +985,7 @@
         applyFilters();
       });
 
-      // 10. EVENTOS DE INTERFAZ Y FILTROS
+      // 10. FILTROS Y CONTROLES
       document.getElementById('btn-toggle-filters').addEventListener('click', () => {
         document.getElementById('panel-filters').classList.toggle('hidden');
       });
@@ -948,7 +1013,7 @@
           const lat = pos.coords.latitude, lng = pos.coords.longitude;
           map.flyTo([lat, lng], 17);
           L.circleMarker([lat, lng], { radius: 8, fillColor: '#2563EB', fillOpacity: 1, color: '#fff', weight: 3 }).addTo(map);
-        }, () => alert('Verificá haber otorgado permiso de ubicación GPS en el navegador.'));
+        }, () => alert('Verificá haber otorgado permiso de ubicación GPS.'));
       });
 
       // 11. LOGIN DE MODERADOR
@@ -970,6 +1035,7 @@
         } else {
           currentUserId = data.user.id;
           await checkAdminStatus();
+          await fetchReports();
           document.getElementById('modal-admin-login').classList.add('hidden');
           alert('Sesión de moderador activa.');
         }
@@ -978,6 +1044,7 @@
         await dbClient.auth.signOut();
         isAdmin = false;
         await initSession();
+        await fetchReports();
         document.getElementById('modal-admin-login').classList.add('hidden');
       });
 
